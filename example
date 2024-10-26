@@ -1,0 +1,463 @@
+import numpy as np
+from PyRae import nn, optim #imports DataRae's custom nn and optim modules containing layers and optimizers
+
+%load_ext autoreload #for jupyter notebook, this reloads modules automatically after each cell execution
+%autoreload 2
+
+def test_linear_forward(layer_class, input_data, weights, biases, expected_output):
+    """
+    Tests the forward method of a Linear layer for general cases.
+
+    Args:
+        layer_class (class): The Linear layer class from `nn.py`.
+        input_data (np.array): The input array (e.g., shape (batch_size, in_features)).
+        weights (np.array): The weights to set for the layer (e.g., shape (in_features, out_features)).
+        biases (np.array): The biases to set for the layer (e.g., shape (1, out_features)).
+        expected_output (np.array): The expected output to verify against.
+
+    Returns:
+        bool: True if the output matches the expected output; False otherwise.
+    """
+
+    layer = layer_class(input_data.shape[1], weights.shape[1])  # Initialize with correct shapes
+    layer.weight = weights
+    layer.bias = biases
+
+    out = layer.forward(input_data)
+    
+    # Check if output matches expected output
+    if np.allclose(out, expected_output):
+        print("Test passed!")
+        return True
+    else:
+        print("Test failed. Output did not match expected result.")
+        print("Output:\n", out)
+        print("Expected:\n", expected_output)
+        return False
+
+
+from tests import test_linear_forward_1, test_linear_forward_2, test_linear_forward_3
+
+tests = [test_linear_forward_1, test_linear_forward_2, test_linear_forward_3]
+results = [test(nn.Linear) for test in tests]
+
+for i, result in enumerate(results, 1):
+    print(f"Test {i}: {'Passed' if result else 'Failed'}")
+
+
+def test_relu_forward_1(ReLU):
+    layer = ReLU()
+    x = np.array([[-3., 1.,  0.],
+                  [ 4., 2., -5.]])
+    
+    out = layer.forward(x)
+    expected_output = np.array([[0., 1., 0.],
+                                [4., 2., 0.]])
+    
+    # Check if the output matches the expected output
+    if np.array_equal(out, expected_output):
+        print("ReLU forward test passed!")
+    else:
+        print("ReLU forward test failed.")
+        print("Output:\n", out)
+        print("Expected:\n", expected_output)
+    
+    return out
+
+
+from tests import test_relu_forward_1, test_relu_forward_2, test_relu_forward_3
+
+tests = [test_relu_forward_1, test_relu_forward_2, test_relu_forward_3]
+results = [test(nn.ReLU) for test in tests]
+
+for i, result in enumerate(results, 1):
+    print(f"ReLU Test {i}: {'Passed' if result else 'Failed'}")
+
+
+def test_feedforward_network(Sequential, Linear, ReLU):
+    # Define a simple network with two linear layers and one ReLU
+    model = Sequential(
+        Linear(3, 4),
+        ReLU(),
+        Linear(4, 2)
+    )
+    
+    # Manually set weights and biases for predictable output
+    model.layers[0].weight = np.array([[1., 2., 3., 4.],
+                                       [5., 6., 7., 8.],
+                                       [9., 10., 11., 12.]])
+    model.layers[0].bias = np.array([[1., 2., 3., 4.]])
+    model.layers[2].weight = np.array([[1., -1.],
+                                       [2., -2.],
+                                       [3., -3.],
+                                       [4., -4.]])
+    model.layers[2].bias = np.array([[1., -1.]])
+
+    # Define an input array
+    x = np.array([[1., 2., 3.],
+                  [4., 5., 6.]])
+
+    # Forward pass through the network
+    out = model.forward(x)
+
+    # Expected output after manual calculation or previous run (example)
+    expected_output = np.array([[273., -273.],
+                                [618., -618.]])
+
+    # Check if output matches expected
+    if np.allclose(out, expected_output):
+        print("Feedforward network test passed!")
+    else:
+        print("Feedforward network test failed.")
+        print("Output:\n", out)
+        print("Expected:\n", expected_output)
+
+    return out
+
+
+from tests import test_sequential_forward_1, test_sequential_forward_2, test_sequential_forward_3
+
+# Run each test case and store results
+answer_1 = test_sequential_forward_1(nn.Sequential, nn.ReLU, nn.Linear)
+answer_2 = test_sequential_forward_2(nn.Sequential, nn.ReLU, nn.Linear)
+answer_3 = test_sequential_forward_3(nn.Sequential, nn.ReLU, nn.Linear)
+
+
+tests = [test_sequential_forward_1, test_sequential_forward_2, test_sequential_forward_3]
+results = [test(nn.Sequential, nn.ReLU, nn.Linear) for test in tests]
+
+for i, result in enumerate(results, 1):
+    print(f"Sequential Test {i}: {'Passed' if result else 'Failed'}")
+
+
+def test_xeloss_forward_1(CrossEntropyLoss):
+    loss_function = CrossEntropyLoss()
+    logits = np.array([[-3., 2., -1., 0.],
+                       [-1., 2., -3., 4.]])
+    labels = np.array([3, 1])
+
+    loss = loss_function.forward(logits, labels)
+    expected_loss = 2.1545793610744024
+
+    # Check if the computed loss is close to the expected loss
+    if np.isclose(loss, expected_loss, atol=1e-6):
+        print("CrossEntropyLoss forward test passed!")
+    else:
+        print("CrossEntropyLoss forward test failed.")
+        print("Computed loss:", loss)
+        print("Expected loss:", expected_loss)
+    
+    return loss
+
+# Run the test
+test_xeloss_forward_1(nn.CrossEntropyLoss)
+
+
+def test_xeloss_backward_1(CrossEntropyLoss):
+    loss_function = CrossEntropyLoss()
+    logits = np.array([[-3., 2., -1., 0.],
+                       [-1., 2., -3., 4.]])
+    labels = np.array([3, 1])
+
+    # Forward pass to store inputs and targets in the loss function
+    loss_function.forward(logits, labels)
+
+    # Backward pass to calculate the gradient
+    grad = loss_function.backward()
+    expected_grad = np.array([[ 2.82665133e-03,  4.19512254e-01,  2.08862853e-02, -4.43225190e-01],
+                              [ 2.94752177e-03, -4.40797443e-01,  3.98903693e-04,  4.37451017e-01]])
+
+    # Check if the computed gradient is close to the expected gradient
+    if np.allclose(grad, expected_grad, atol=1e-6):
+        print("CrossEntropyLoss backward test passed!")
+    else:
+        print("CrossEntropyLoss backward test failed.")
+        print("Computed gradient:\n", grad)
+        print("Expected gradient:\n", expected_grad)
+    
+    return grad
+
+# Run the test
+print("Your answer:")
+print(test_xeloss_backward_1(nn.CrossEntropyLoss))
+print("Should be equal to:")
+print(np.array([[ 2.82665133e-03,  4.19512254e-01,  2.08862853e-02, -4.43225190e-01], 
+                [ 2.94752177e-03, -4.40797443e-01,  3.98903693e-04,  4.37451017e-01]]))
+
+
+tests = [test_xeloss_backward_1, test_xeloss_backward_2, test_xeloss_backward_3]
+results = [test(nn.CrossEntropyLoss) for test in tests]
+
+for i, result in enumerate(results, 1):
+    print(f"CrossEntropyLoss Backward Test {i}: {'Passed' if result else 'Failed'}")
+
+
+def test_linear_backward_1(Linear):
+    layer = Linear(2, 4)
+    layer.weight = np.array([[1., 2., 3., 2.],
+                             [-1., 4., -2., 3.]])
+    layer.bias = np.array([[1., 2., 3., 4.]])
+    layer.x = np.array([[1., -2.],
+                        [0., -6.]])
+
+    grad = np.array([[1., 0., 3., 2.],
+                     [5., 5., -1., 0.]])
+    
+    # Perform backward pass to calculate gradients
+    grad_x = layer.backward(grad)
+
+    # Expected values
+    expected_grad_x = np.array([[14., -1.], [12., 17.]])
+    expected_grad_weight = np.array([[1., 0., 3., 2.],
+                                     [-32., -30., 0., -4.]])
+    expected_grad_bias = np.array([[6., 5., 2., 2.]])
+
+    # Check if computed gradients match expected gradients
+    if (np.allclose(grad_x, expected_grad_x, atol=1e-6) and
+        np.allclose(layer.grad_weight, expected_grad_weight, atol=1e-6) and
+        np.allclose(layer.grad_bias, expected_grad_bias, atol=1e-6)):
+        print("Linear backward test passed!")
+    else:
+        print("Linear backward test failed.")
+        print("Computed grad_x:\n", grad_x)
+        print("Expected grad_x:\n", expected_grad_x)
+        print("Computed grad_weight:\n", layer.grad_weight)
+        print("Expected grad_weight:\n", expected_grad_weight)
+        print("Computed grad_bias:\n", layer.grad_bias)
+        print("Expected grad_bias:\n", expected_grad_bias)
+
+    return grad_x, layer.grad_weight, layer.grad_bias
+
+# Run the test
+print("Your answer:")
+print(test_linear_backward_1(nn.Linear))
+print("Should be equal to:")
+print(np.array([[14., -1.], [12., 17.]]), np.array([[1., 0., 3., 2.], [-32., -30., 0., -4.]]), np.array([[6., 5., 2., 2.]]))
+
+
+from tests import test_linear_backward_1, test_linear_backward_2, test_linear_backward_3
+
+# Run individual tests and print results
+answer_1 = test_linear_backward_1(nn.Linear)
+answer_2 = test_linear_backward_2(nn.Linear)
+answer_3 = test_linear_backward_3(nn.Linear)
+
+
+# Define a list of tests to run
+tests = [test_linear_backward_1, test_linear_backward_2, test_linear_backward_3]
+results = []
+
+# Run each test and store the results
+for i, test in enumerate(tests, 1):
+    result = test(nn.Linear)
+    results.append(result)
+    print(f"Test {i} Result:", "Passed" if result else "Failed")
+
+# Summarize all test results
+print("\nSummary of Results:")
+for i, result in enumerate(results, 1):
+    print(f"Linear Backward Test {i}: {'Passed' if result else 'Failed'}")
+
+
+def test_relu_backward_1(ReLU):
+    layer = ReLU()
+    layer.x = np.array([[1., -2., 3., -4.],
+                        [5., 6., -0., 0.]])
+    
+    grad = np.array([[-1., 2., -3., 4.],
+                     [0., 6., -2., 8.]])
+    
+    # Perform backward pass to calculate grad_x
+    grad_x = layer.backward(grad)
+    
+    # Expected gradient output
+    expected_grad_x = np.array([[-1., 0., -3., 0.],
+                                [0., 6., 0., 0.]])
+    
+    # Check if grad_x matches the expected output
+    if np.array_equal(grad_x, expected_grad_x):
+        print("ReLU backward test passed!")
+    else:
+        print("ReLU backward test failed.")
+        print("Computed grad_x:\n", grad_x)
+        print("Expected grad_x:\n", expected_grad_x)
+    
+    return grad_x
+
+# Run the test
+print("Your answer:")
+print(test_relu_backward_1(nn.ReLU))
+print("Should be equal to:")
+print(np.array([[-1., 0., -3., 0.], [0., 6., 0., 0.]]))
+
+from tests import test_relu_backward_1, test_relu_backward_2, test_relu_backward_3
+
+# Run individual tests and store results
+answer_1 = test_relu_backward_1(nn.ReLU)
+answer_2 = test_relu_backward_2(nn.ReLU)
+answer_3 = test_relu_backward_3(nn.ReLU)
+
+print("Test 1 Result:", answer_1)
+print("Test 2 Result:", answer_2)
+print("Test 3 Result:", answer_3)
+
+# List of tests to run
+tests = [test_relu_backward_1, test_relu_backward_2, test_relu_backward_3]
+results = []
+
+# Run each test and store results
+for i, test in enumerate(tests, 1):
+    result = test(nn.ReLU)
+    results.append(result)
+    print(f"ReLU Backward Test {i} Result:", "Passed" if result else "Failed")
+
+# Summarize results
+print("\nSummary of Results:")
+for i, result in enumerate(results, 1):
+    print(f"ReLU Backward Test {i}: {'Passed' if result else 'Failed'}")
+
+
+def test_sequential_backward_1(Sequential, ReLU, Linear, CrossEntropyLoss):
+    loss_function = CrossEntropyLoss()
+    model = Sequential(ReLU(), Linear(2, 4), ReLU())
+    
+    # Set weights and biases for a predictable output
+    model.layers[1].weight = np.array([[-1., 4., -1., 4.],
+                                       [-3., 8., -5., 5.]])
+    model.layers[1].bias = np.array([[-2., 3., 1., -2.]])
+    
+    x = np.array([[1.,  5.],
+                  [2., -3.],
+                  [4., -1]])
+    
+    # Perform forward pass
+    out = model.forward(x)
+    labels = np.array([0, 1, 1])
+    
+    # Forward pass for loss
+    loss_function.forward(out, labels)
+    
+    # Perform backward pass
+    model.backward(loss_function)
+    
+    # Expected gradients for the Linear layer
+    expected_grad_weight = np.array([expected values here])
+    expected_grad_bias = np.array([expected values here])
+    
+    # Compare gradients for weight and bias
+    grad_weight_correct = np.allclose(model.layers[1].grad_weight, expected_grad_weight, atol=1e-6)
+    grad_bias_correct = np.allclose(model.layers[1].grad_bias, expected_grad_bias, atol=1e-6)
+    
+    if grad_weight_correct and grad_bias_correct:
+        print("Sequential backward test passed!")
+    else:
+        print("Sequential backward test failed.")
+        if not grad_weight_correct:
+            print("Computed grad_weight:\n", model.layers[1].grad_weight)
+            print("Expected grad_weight:\n", expected_grad_weight)
+        if not grad_bias_correct:
+            print("Computed grad_bias:\n", model.layers[1].grad_bias)
+            print("Expected grad_bias:\n", expected_grad_bias)
+
+    return model
+
+
+def test_sequential_backward_1(Sequential, ReLU, Linear, CrossEntropyLoss):
+    loss_function = CrossEntropyLoss()
+    model = Sequential(ReLU(), Linear(2, 4), ReLU())
+    
+    # Set specific weights and biases for reproducibility
+    model.layers[1].weight = np.array([[-1., 4., -1., 4.],
+                                       [-3., 8., -5., 5.]])
+    model.layers[1].bias = np.array([[-2., 3., 1., -2.]])
+    
+    x = np.array([[1., 5.],
+                  [2., -3.],
+                  [4., -1]])
+    
+    # Forward and backward passes
+    out = model.forward(x)
+    labels = np.array([0, 1, 1])
+    loss_function.forward(out, labels)
+    model.backward(loss_function)
+
+    # Expected gradients (placeholder values - replace with actual expected results)
+    expected_grad_weight = np.array([[-2., 1., 0., 2.], [-3., 3., -1., 0.]])  # Example values
+    expected_grad_bias = np.array([[0., -1., 2., -1.]])  # Example values
+
+    # Check gradients
+    grad_weight_correct = np.allclose(model.layers[1].grad_weight, expected_grad_weight, atol=1e-6)
+    grad_bias_correct = np.allclose(model.layers[1].grad_bias, expected_grad_bias, atol=1e-6)
+    
+    # Print results
+    if grad_weight_correct and grad_bias_correct:
+        print("Sequential backward test passed!")
+        return True
+    else:
+        print("Sequential backward test failed.")
+        if not grad_weight_correct:
+            print("Computed grad_weight:\n", model.layers[1].grad_weight)
+            print("Expected grad_weight:\n", expected_grad_weight)
+        if not grad_bias_correct:
+            print("Computed grad_bias:\n", model.layers[1].grad_bias)
+            print("Expected grad_bias:\n", expected_grad_bias)
+        return False
+
+
+from tests import test_sequential_backward_1, test_sequential_backward_2, test_sequential_backward_3
+
+# Define test list
+tests = [test_sequential_backward_1, test_sequential_backward_2, test_sequential_backward_3]
+
+# Run each test and store results
+results = []
+for i, test in enumerate(tests, 1):
+    result = test(nn.Sequential, nn.ReLU, nn.Linear, nn.CrossEntropyLoss)
+    results.append(result)
+    print(f"Sequential Backward Test {i}:", "Passed" if result else "Failed")
+
+# Print summary
+print("\nSummary of Sequential Backward Test Results:")
+for i, result in enumerate(results, 1):
+    print(f"Test {i}: {'Passed' if result else 'Failed'}")
+
+def test_sgd_1(SGD, Sequential, Linear, ReLU):
+    model = Sequential(Linear(2, 3), ReLU())
+    
+    # Set initial weights, biases, and gradients for the test
+    model.layers[0].weight = np.array([[-3.,  2., -1.],
+                                       [ 0., -1.,  2.]])
+    model.layers[0].bias = np.array([[1., 0., -3.]])
+    model.layers[0].grad_weight = np.array([[-10.,  9., -8.],
+                                            [  7., -6.,  5.]])
+    model.layers[0].grad_bias = np.array([[-3., 3., -3.]])
+
+    lr = 0.15
+    optimizer = SGD(model, lr)
+    optimizer.step()
+
+    # Expected updated values for weights and biases
+    expected_weight = np.array([[-3. + 0.15 * 10.,  2. - 0.15 * 9., -1. + 0.15 * 8.],
+                                [ 0. - 0.15 * 7., -1. + 0.15 * 6.,  2. - 0.15 * 5.]])
+    expected_bias = np.array([[1. + 0.15 * 3., 0. - 0.15 * 3., -3. + 0.15 * 3.]])
+
+    # Check if updated weights and biases match expected values
+    weight_correct = np.allclose(model.layers[0].weight, expected_weight, atol=1e-6)
+    bias_correct = np.allclose(model.layers[0].bias, expected_bias, atol=1e-6)
+    
+    if weight_correct and bias_correct:
+        print("SGD optimizer test passed!")
+    else:
+        print("SGD optimizer test failed.")
+        if not weight_correct:
+            print("Computed weight:\n", model.layers[0].weight)
+            print("Expected weight:\n", expected_weight)
+        if not bias_correct:
+            print("Computed bias:\n", model.layers[0].bias)
+            print("Expected bias:\n", expected_bias)
+
+    return model
+
+
+
+
